@@ -19,23 +19,28 @@ extension GCKeyboard {
 class ButtonAction: Action {
     func invalidate() {
         Toucher.touchcam(point: point, phase: UITouch.Phase.ended, tid: id)
+        if let keyboard = GCKeyboard.coalesced?.keyboardInput {
+            keyboard.button(forKeyCode: key)?.pressedChangedHandler = nil
+        }
     }
 
     let key: GCKeyCode
-    let keyid: Int
     let point: CGPoint
     var id: Int
 
-    init(id: Int, keyid: Int, key: GCKeyCode, point: CGPoint) {
-        self.keyid = keyid
+    init(id: Int, key: GCKeyCode, point: CGPoint) {
         self.key = key
         self.point = point
         self.id = id
         if let keyboard = GCKeyboard.coalesced?.keyboardInput {
-            if !PlayMice.shared.setMiceButtons(keyid, action: self) {
-                keyboard.button(forKeyCode: key)?.pressedChangedHandler = { _, _, pressed in
+            if !PlayMice.shared.setMiceButtons(key.rawValue, action: self) {
+                let handler = keyboard.button(forKeyCode: key)?.pressedChangedHandler
+                keyboard.button(forKeyCode: key)?.pressedChangedHandler = { button, value, pressed in
                     if !mode.visible && !PlayInput.cmdPressed() {
                         self.update(pressed: pressed)
+                    }
+                    if let previous = handler {
+                        previous(button, value, pressed)
                     }
                 }
             }
@@ -45,8 +50,7 @@ class ButtonAction: Action {
     convenience init(id: Int, data: Button) {
         self.init(
             id: id,
-            keyid: data.keyCode,
-            key: GCKeyCode(rawValue: CFIndex(data.keyCode)),
+            key: GCKeyCode(rawValue: data.keyCode),
             point: CGPoint(
                 x: data.transform.xCoord.absoluteX,
                 y: data.transform.yCoord.absoluteY))
@@ -66,9 +70,9 @@ class DraggableButtonAction: ButtonAction {
 
     var releasePoint: CGPoint
 
-    override init(id: Int, keyid: Int, key: GCKeyCode, point: CGPoint) {
+    override init(id: Int, key: GCKeyCode, point: CGPoint) {
         self.releasePoint = point
-        super.init(id: id, keyid: keyid, key: key, point: point)
+        super.init(id: id, key: key, point: point)
         if settings.mouseMapping {
             PlayMice.shared.setupMouseMovedHandler()
         }
@@ -112,8 +116,12 @@ class JoystickAction: Action {
         self.id = id
         if let keyboard = GCKeyboard.coalesced?.keyboardInput {
             for key in keys {
-                keyboard.button(forKeyCode: key)?.pressedChangedHandler = { _, _, _ in
+                let handler = keyboard.button(forKeyCode: key)?.pressedChangedHandler
+                keyboard.button(forKeyCode: key)?.pressedChangedHandler = { button, value, pressed in
                     Toucher.touchQueue.async(execute: self.update)
+                    if let previous = handler {
+                        previous(button, value, pressed)
+                    }
                 }
             }
         }
@@ -137,6 +145,11 @@ class JoystickAction: Action {
     func invalidate() {
         Toucher.touchcam(point: center, phase: UITouch.Phase.ended, tid: id)
         self.moving = false
+        if let keyboard = GCKeyboard.coalesced?.keyboardInput {
+            for key in keys {
+                keyboard.button(forKeyCode: key)?.pressedChangedHandler = nil
+            }
+        }
     }
 
     func update() {
