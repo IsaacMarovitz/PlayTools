@@ -58,6 +58,7 @@
         }
 
         [objc_getClass("IOSViewController") swizzleInstanceMethod:@selector(prefersPointerLocked) withMethod:@selector(hook_prefersPointerLocked)];
+        [objc_getClass("GKLocalPlayer") swizzleInstanceMethod:@selector(authenticateWithCompletionHandler) withMethod:@selector(hook_authenticateWithCompletionHandler)];
         [self swizzleInstanceMethod:@selector(init) withMethod:@selector(hook_init)];
     });
 }
@@ -76,6 +77,10 @@
 
 - (CGSize) hook_size {
     return [PlayScreen sizeAspectRatio:[self hook_size]];
+}
+
+- (void) hook_authenticateWithCompletionHandler {
+    return;
 }
 
 - (id) hook_init {
