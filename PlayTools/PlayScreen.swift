@@ -10,6 +10,11 @@ let screen = PlayScreen.shared
 let mainScreenWidth = PlaySettings.shared.windowSizeWidth
 let mainScreenHeight = PlaySettings.shared.windowSizeHeight
 
+struct VersionPlist: Decodable {
+    // swiftlint:disable:next identifier_name
+    var ProductVersion: String
+}
+
 extension CGSize {
     func aspectRatio() -> CGFloat {
         if mainScreenWidth > mainScreenHeight {
@@ -20,11 +25,18 @@ extension CGSize {
     }
 
     func toAspectRatio() -> CGSize {
-        if #available(macCatalyst 16.3, *) {
-            return CGSize(width: mainScreenWidth, height: mainScreenHeight)
-        } else {
-            return CGSize(width: mainScreenHeight, height: mainScreenWidth)
-        }
+        var data = FileManager.default.contents(atPath: "/System/Library/CoreServices/SystemVersion.plist")
+        do {
+            var plist = try PropertyListDecoder().decode(VersionPlist.self, from: data!)
+
+            if plist.ProductVersion.compare("13.2", options: .numeric) == .orderedDescending {
+                return CGSize(width: mainScreenWidth, height: mainScreenHeight)
+            } else {
+                return CGSize(width: mainScreenHeight, height: mainScreenWidth)
+            }
+        } catch {}
+
+        return CGSize(width: 1, height: 1)
     }
 }
 
